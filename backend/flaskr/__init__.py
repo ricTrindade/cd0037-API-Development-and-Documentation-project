@@ -1,15 +1,14 @@
 from flask import Flask, request, abort, jsonify
 from flask_cors import CORS
-import random
 from models import setup_db, Question, Category, db
 
 QUESTIONS_PER_PAGE = 10
 
 def create_app(test_config=None):
+
     # create and configure the app
     app = Flask(__name__)
-    cors = CORS(app)
-    #cors = CORS(app, resources={"*": {"origins": "*"}})
+    CORS(app, resources={"*": {"origins": "*"}})
 
     if test_config is None:
         setup_db(app)
@@ -20,6 +19,10 @@ def create_app(test_config=None):
     """
     @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
     """
+
+    with app.app_context():
+        db.create_all()
+
     # CORS Headers
     @app.after_request
     def after_request(response):
@@ -27,18 +30,18 @@ def create_app(test_config=None):
         response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
         return response
 
-    with app.app_context():
-        db.create_all()
+    # TODO: CHECK IF PAGINATION IS NEEDED
+    @app.route('/categories', methods=['GET'])
+    def get_categories():
+        # Query all categories from the database
+        categories = Category.query.all()
 
-    """
-    @TODO: Use the after_request decorator to set Access-Control-Allow
-    """
+        # Convert categories into the required dictionary format
+        categories_dict = {c.id: c.type for c in categories}
 
-    """
-    @TODO:
-    Create an endpoint to handle GET requests
-    for all available categories.
-    """
+        return jsonify({
+            'categories': categories_dict
+        })
 
 
     """
@@ -53,36 +56,17 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
+    # TODO: IMPLEMENT PAGINATION
     @app.route('/questions')
     def show_questions():
-        return jsonify({
-            'questions': [
-                {'id': 1, 'question': 'Test question?', 'category': 'Science', 'difficulty': 2},
-                {'id': 2, 'question': 'Another question?', 'category': 'History', 'difficulty': 3}
-            ],
-            'totalQuestions': 2,
-            'categories': {
-                'Science': 'Science',
-                'History': 'History'
-            },
-            'currentCategory': 'Science',  # Ensure this is a valid category
-        })
-
-    '''
-    I am not sure if there's already a comment for this code
-    '''
-    @app.route('/categories', methods=['GET'])
-    def get_categories():
-        categories = {
-            1: "Science",
-            2: "History",
-            3: "Math",
-            4: "Literature",
-            5: "Technology"
-        }
+        questions = Question.query.all()
+        categories = Category.query.all()
 
         return jsonify({
-            'categories': categories
+            'questions': [q.format() for q in questions],
+            'totalQuestions': len(questions),
+            'categories': {c.id: c.type for c in categories},
+            'currentCategory': Category.query.order_by('id').first().type if categories else None
         })
 
     """
@@ -92,6 +76,23 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page.
     """
+    @app.route('/questions/<int:question_id>', methods=['DELETE'])
+    def delete_question(question_id):
+        # Find the question by its ID
+        question = Question.query.get(question_id)
+
+        # If the question doesn't exist, return a 404 error
+        if not question:
+            return jsonify({'error': 'Question not found'}), 404
+
+        # Delete the question from the database
+        try:
+            db.session.delete(question)
+            db.session.commit()
+            return jsonify({'message': 'Question deleted successfully'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
 
     """
     @TODO:
@@ -103,6 +104,44 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
+    @app.route('/questions', methods=['POST'])
+    def submit_question():
+        # Get the data from the request
+        data = request.get_json()
+
+        # Extract individual fields
+        question_text = data.get('question')
+        answer = data.get('answer')
+        difficulty = data.get('difficulty')
+        category_id = data.get('category')
+
+        # Validate the data
+        if not question_text or not answer or not difficulty or not category_id:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Find the category from the database
+        category = Category.query.get(category_id)
+
+        # If category doesn't exist, return an error
+        if not category:
+            return jsonify({'error': 'Category not found'}), 404
+
+        # Create a new question
+        new_question = Question(
+            question=question_text,
+            answer=answer,
+            difficulty=difficulty,
+            category=category_id  # assuming category_id is passed as the foreign key
+        )
+
+        # Add the question to the database and commit
+        try:
+            db.session.add(new_question)
+            db.session.commit()
+            return jsonify({'message': 'Question added successfully', 'question': new_question.format()}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
 
     """
     @TODO:
@@ -114,6 +153,30 @@ def create_app(test_config=None):
     only question that include that string within their question.
     Try using the word "title" to start.
     """
+    @app.route('/questions/search', methods=['POST'])
+    def search_questions():
+        data = request.get_json()
+
+        # Extract search term from the request data
+        search_term = data.get('searchTerm', '').strip()
+
+        # If no search term is provided, return all questions
+        if not search_term:
+            return jsonify({'error': 'Search term is required'}), 400
+
+        # Query the database for questions matching the search term (case insensitive)
+        questions = Question.query.filter(
+            Question.question.ilike(f'%{search_term}%')  # Using ILIKE for case-insensitive search
+        ).all()
+
+        # Format the questions for the response
+        questions_data = [q.format() for q in questions]
+
+        return jsonify({
+            'questions': questions_data,
+            'total_questions': len(questions_data),
+            'current_category': 'All Categories',  # Or get the category if needed
+        })
 
     """
     @TODO:
@@ -123,41 +186,19 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+    @app.route('/categories/<int:category_id>/questions', methods=['GET'])
+    def get_questions_by_category(category_id):
 
-    @app.route('/categories/<string:category_name>/questions', methods=['GET'])
-    def get_questions_by_category(category_name):
-        # Sample data for categories and questions
-        categories = {
-            "Science": 1,
-            "History": 2,
-            "Math": 3,
-            "Literature": 4,
-            "Technology": 5
-        }
+        # Find the category by ID
+        category = Category.query.get_or_404(category_id)
 
-        questions_data = {
-            "Science": [
-                {'id': 1, 'question': 'What is the chemical symbol for water?', 'category': 'Science'},
-                {'id': 2, 'question': 'What is the speed of light?', 'category': 'Science'}
-            ],
-            "History": [
-                {'id': 3, 'question': 'Who discovered America?', 'category': 'History'},
-                {'id': 4, 'question': 'What year did WWII end?', 'category': 'History'}
-            ]
-            # Add more categories and questions as needed
-        }
-
-        # Check if the category exists
-        if category_name not in categories:
-            return jsonify({'error': 'Category not found'}), 404
-
-        # Get the questions for the specified category
-        questions = questions_data.get(category_name, [])
+        # Fetch questions associated with this category
+        questions = Question.query.filter_by(category=category_id).all()
 
         return jsonify({
-            'questions': questions,
+            'questions': [q.format() for q in questions],
             'total_questions': len(questions),
-            'current_category': category_name
+            'current_category': category.type
         })
 
     """
@@ -171,6 +212,41 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
+    @app.route('/quizzes', methods=['POST'])
+    def get_next_question():
+        data = request.get_json()
+
+        # Extract previous questions and quiz category from request data
+        previous_questions = data.get('previous_questions', [])
+        quiz_category = data.get('quiz_category', {})
+
+        # Validate quiz_category
+        category_id = quiz_category.get('id')
+
+        if category_id == 0:
+            query_filter = True  # No category filter, fetch from all categories
+        elif category_id:
+            query_filter = (Question.category == category_id)
+        else:
+            return jsonify({'error': 'Invalid category'}), 400
+
+        # TODO: Verify the code below for ALL(id=0)
+        questions = Question.query.filter(
+            query_filter,
+            ~Question.id.in_(previous_questions)
+        ).order_by(Question.id).all()
+
+        # If no more questions are available, end the quiz
+        if not questions:
+            return jsonify({'question': None, 'force_end': True})
+
+        # Get the next question (first in the ordered list)
+        next_question = questions[0]
+
+        return jsonify({
+            'question': next_question.format(),  # Assuming your Question model has a format() method
+            'force_end': False
+        })
 
     """
     @TODO:
