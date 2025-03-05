@@ -22,6 +22,10 @@ def create_app(test_config=None):
     with app.app_context():
         db.create_all()
 
+    @app.route('/')
+    def hello():
+        return jsonify({'message': 'HELLO WORLD!'})
+
     """
     @TODO: Use the after_request decorator to set Access-Control-Allow
     """
@@ -105,3 +109,6 @@ def create_app(test_config=None):
 
     return app
 
+if __name__ == '__main__':
+   create_app().run(host="0.0.0.0", port=5000)
+   print('code changes')
