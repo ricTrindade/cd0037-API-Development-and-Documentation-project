@@ -1,7 +1,6 @@
 from flask import Flask, request, abort, jsonify
 from flask_cors import CORS
 import random
-
 from models import setup_db, Question, Category, db
 
 QUESTIONS_PER_PAGE = 10
@@ -9,6 +8,8 @@ QUESTIONS_PER_PAGE = 10
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
+    cors = CORS(app)
+    #cors = CORS(app, resources={"*": {"origins": "*"}})
 
     if test_config is None:
         setup_db(app)
@@ -19,12 +20,15 @@ def create_app(test_config=None):
     """
     @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
     """
+    # CORS Headers
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,true')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
+        return response
+
     with app.app_context():
         db.create_all()
-
-    @app.route('/')
-    def hello():
-        return jsonify({'message': 'HELLO WORLD!'})
 
     """
     @TODO: Use the after_request decorator to set Access-Control-Allow
@@ -49,6 +53,37 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
+    @app.route('/questions')
+    def show_questions():
+        return jsonify({
+            'questions': [
+                {'id': 1, 'question': 'Test question?', 'category': 'Science', 'difficulty': 2},
+                {'id': 2, 'question': 'Another question?', 'category': 'History', 'difficulty': 3}
+            ],
+            'totalQuestions': 2,
+            'categories': {
+                'Science': 'Science',
+                'History': 'History'
+            },
+            'currentCategory': 'Science',  # Ensure this is a valid category
+        })
+
+    '''
+    I am not sure if there's already a comment for this code
+    '''
+    @app.route('/categories', methods=['GET'])
+    def get_categories():
+        categories = {
+            1: "Science",
+            2: "History",
+            3: "Math",
+            4: "Literature",
+            5: "Technology"
+        }
+
+        return jsonify({
+            'categories': categories
+        })
 
     """
     @TODO:
@@ -88,6 +123,42 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+
+    @app.route('/categories/<string:category_name>/questions', methods=['GET'])
+    def get_questions_by_category(category_name):
+        # Sample data for categories and questions
+        categories = {
+            "Science": 1,
+            "History": 2,
+            "Math": 3,
+            "Literature": 4,
+            "Technology": 5
+        }
+
+        questions_data = {
+            "Science": [
+                {'id': 1, 'question': 'What is the chemical symbol for water?', 'category': 'Science'},
+                {'id': 2, 'question': 'What is the speed of light?', 'category': 'Science'}
+            ],
+            "History": [
+                {'id': 3, 'question': 'Who discovered America?', 'category': 'History'},
+                {'id': 4, 'question': 'What year did WWII end?', 'category': 'History'}
+            ]
+            # Add more categories and questions as needed
+        }
+
+        # Check if the category exists
+        if category_name not in categories:
+            return jsonify({'error': 'Category not found'}), 404
+
+        # Get the questions for the specified category
+        questions = questions_data.get(category_name, [])
+
+        return jsonify({
+            'questions': questions,
+            'total_questions': len(questions),
+            'current_category': category_name
+        })
 
     """
     @TODO:
