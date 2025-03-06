@@ -40,7 +40,6 @@ def create_app(test_config=None):
             'categories': categories_dict
         })
 
-    # TODO: Front-End does not seem to render the page numbers, need to investigate
     @app.route('/questions')
     def show_questions():
 
@@ -125,13 +124,12 @@ def create_app(test_config=None):
             print(e)
             abort(500)
 
-    # TODO: Include Pagination Here
     @app.route('/questions/search', methods=['POST'])
     def search_questions():
 
         # Get the data from the request
         data = request.get_json()
-        search_term = data.get('searchTerm', '').strip() # TODO: Decide if this is needed
+        search_term = data.get('searchTerm', '').strip()
 
         # If no search term is provided, return all questions
         if not search_term:
@@ -161,15 +159,19 @@ def create_app(test_config=None):
             'current_category': Category.query.get(questions[0].id)
         })
 
-   # TODO: Include Pagination Here
     @app.route('/categories/<int:category_id>/questions', methods=['GET'])
     def get_questions_by_category(category_id):
+
+        # Get info from request
+        page = request.args.get('page', 1, type=int)
+        start = (page - 1) * QUESTIONS_PER_PAGE
+        end = start + QUESTIONS_PER_PAGE
 
         # Find the category by ID
         category = Category.query.get_or_404(category_id)
 
         # Fetch questions associated with this category
-        questions = Question.query.filter_by(category=category_id).all()
+        questions = Question.query.filter_by(category=category_id).all()[start:end]
 
         return jsonify({
             'success': True,
@@ -196,7 +198,6 @@ def create_app(test_config=None):
         else:
             abort(400)
 
-        # TODO: Verify the code below for ALL(id=0)
         questions = Question.query.filter(
             query_filter,
             ~Question.id.in_(previous_questions)
