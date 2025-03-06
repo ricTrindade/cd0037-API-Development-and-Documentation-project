@@ -2,7 +2,7 @@ from flask import Flask, request, abort, jsonify
 from flask_cors import CORS
 from models import setup_db, Question, Category, db
 
-QUESTIONS_PER_PAGE = 3
+QUESTIONS_PER_PAGE = 10
 
 def create_app(test_config=None):
 

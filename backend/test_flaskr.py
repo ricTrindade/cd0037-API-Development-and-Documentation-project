@@ -1,8 +1,12 @@
 import os
 import unittest
 
+from dotenv import load_dotenv
+
 from flaskr import create_app
 from models import db, Question, Category
+
+load_dotenv()
 
 
 class TriviaTestCase(unittest.TestCase):
@@ -10,10 +14,10 @@ class TriviaTestCase(unittest.TestCase):
 
     def setUp(self):
         """Define test variables and initialize app."""
-        self.database_name = "trivia_test"
-        self.database_user = "postgres"
-        self.database_password = "password"
-        self.database_host = "localhost:5432"
+        self.database_name = os.getenv("database_name")
+        self.database_user = os.getenv("database_user")
+        self.database_password = os.getenv("database_password")
+        self.database_host = os.getenv("database_host")
         self.database_path = f"postgresql://{self.database_user}:{self.database_password}@{self.database_host}/{self.database_name}"
 
         # Create app with the test configuration
