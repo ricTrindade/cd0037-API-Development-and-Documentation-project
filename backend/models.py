@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-database_name = os.getenv("database_name")
+database_name = os.getenv("database_name_test")
 database_user = os.getenv("database_user")
 database_password = os.getenv("database_password")
 database_host = os.getenv("database_host")

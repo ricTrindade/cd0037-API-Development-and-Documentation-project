@@ -80,7 +80,7 @@ def create_app(test_config=None):
             })
         except Exception as e:
             db.session.rollback()
-            return abort(500)
+            abort(500)
 
     @app.route('/questions', methods=['POST'])
     def submit_question():
@@ -94,21 +94,21 @@ def create_app(test_config=None):
 
         # Validate the data
         if not question_text or not answer or not difficulty or not category_id:
-            return abort(400, msg='Missing required fields')
+            abort(400)
 
         # Find the category from the database
         category = Category.query.get(category_id)
 
         # If category doesn't exist, return an error
         if not category:
-            return abort(404, msg='Category not found')
+            abort(404)
 
         # Create a new question
         new_question = Question(
             question=question_text,
             answer=answer,
             difficulty=difficulty,
-            category=category_id  # assuming category_id is passed as the foreign key
+            category=category_id
         )
 
         # Add the question to the database and commit
@@ -119,10 +119,11 @@ def create_app(test_config=None):
                 'success': True,
                 'message': 'Question added successfully',
                 'question': new_question.format()
-            }),
+            })
         except Exception as e:
             db.session.rollback()
-            return abort(500,  msg=str(e))
+            print(e)
+            abort(500)
 
     # TODO: Include Pagination Here
     @app.route('/questions/search', methods=['POST'])
@@ -134,7 +135,7 @@ def create_app(test_config=None):
 
         # If no search term is provided, return all questions
         if not search_term:
-            return abort(400, msg='No search term supplied')
+            abort(400)
 
         # Query the database for questions matching the search term
         questions = Question.query.filter(
@@ -193,7 +194,7 @@ def create_app(test_config=None):
         elif category_id:
             query_filter = (Question.category == category_id)
         else:
-            return abort(400, msg='Invalid category')
+            abort(400)
 
         # TODO: Verify the code below for ALL(id=0)
         questions = Question.query.filter(
@@ -218,34 +219,40 @@ def create_app(test_config=None):
             'force_end': False
         })
 
-    # TODO: Test the errors below
     @app.errorhandler(422)
-    def unprocessable():
+    def unprocessable(error):
         return jsonify({
             'success': False,
             'message': 'unprocessable'
-        })
+        }), 422
+
+    @app.errorhandler(415)
+    def unsupported_media_type(error):
+        return jsonify({
+            'success': False,
+            'message': 'Unsupported Media Type'
+        }), 415
 
     @app.errorhandler(400)
-    def page_not_found(msg='page not found'):
+    def page_not_found(error):
         return jsonify({
             'success': False,
-            'message': msg
-        })
+            'message': 'bad request'
+        }), 400
 
     @app.errorhandler(500)
-    def server_error(msg='server Error'):
+    def server_error(error):
         return jsonify({
             'success': False,
-            'message': msg
-        })
+            'message': 'server Error'
+        }), 500
 
     @app.errorhandler(404)
-    def resource_not_found(msg='resource not found'):
+    def resource_not_found(error):
         return jsonify({
             'success': False,
-            'message': msg
-        })
+            'message': 'resource not found'
+        }), 404
 
     return app
 
